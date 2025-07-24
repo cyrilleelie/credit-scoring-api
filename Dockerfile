@@ -18,11 +18,9 @@ RUN pip install --no-cache-dir poetry \
 # Copie tout le code de l'application
 COPY . .
 
-# Expose les ports nécessaires
-EXPOSE 8501
+# Expose le port standard de Hugging Face
 EXPOSE 7860
 
-# --- COMMANDE DE DÉMARRAGE MODIFIÉE ---
-# Lance UNIQUEMENT le dashboard Streamlit pour le débogage.
-# On utilise la forme "exec" pour plus de robustesse.
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# --- COMMANDE DE DÉMARRAGE CORRIGÉE ---
+# Lance Streamlit sur le port 7860, attendu par Hugging Face
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
