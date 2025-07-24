@@ -1,31 +1,24 @@
 #!/bin/bash
 
-echo "--- [DEBUG] Vérification des variables d'environnement ---"
-printenv | grep -E 'API_URL|DB_HOST|MODEL_PATH'
-
-# --- NOUVEAU BLOC DE DÉBOGAGE ---
-echo "--- [DEBUG] Tentative d'importation de l'application API pour détection d'erreur ---"
-python -c "from src.api.main import app"
-IMPORT_STATUS=$? # Récupère le code de sortie de la commande précédente
-
-if [ $IMPORT_STATUS -ne 0 ]; then
-    echo "--- ERREUR CRITIQUE : L'importation de l'application API a échoué. Le démarrage est annulé. ---"
-    exit 1
-else
-    echo "--- SUCCÈS : L'importation de l'application API a réussi. ---"
-fi
-# --- FIN DU NOUVEAU BLOC ---
-
-
 echo "--- Démarrage du serveur API FastAPI en arrière-plan ---"
+
+# Lance l'API, redirige ses logs et capture son Process ID (PID)
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
+API_PID=$!
 
-sleep 5
+echo "API lancée avec le PID: $API_PID. Attente de 8 secondes pour la stabilisation..."
+sleep 8
 
-echo "--- Contenu des logs de l'API (api.log) ---"
-cat api.log
-echo "--------------------------------------------"
-
+# Vérifie si le processus de l'API est toujours en cours d'exécution
+if kill -0 $API_PID > /dev/null 2>&1; then
+    echo "--- SUCCÈS: Le processus de l'API est toujours actif. ---"
+else
+    echo "--- ERREUR CRITIQUE: Le processus de l'API a planté au démarrage. ---"
+    echo "--- Affichage des logs de l'API (api.log) pour le débogage : ---"
+    cat api.log
+    echo "---------------------------------------------------------"
+    exit 1 # Arrête le script pour que l'erreur soit visible dans les logs HF
+fi
 
 echo "--- Démarrage du Dashboard Streamlit ---"
 streamlit run app.py --server.port 7860 --server.address 0.0.0.0
