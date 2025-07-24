@@ -1,23 +1,30 @@
 #!/bin/bash
 
-# Affiche un message pour indiquer le début du démarrage de l'API
+echo "--- [DEBUG] Vérification des variables d'environnement ---"
+# Affiche quelques variables clés pour s'assurer qu'elles sont bien chargées depuis les secrets
+printenv | grep -E 'API_URL|DB_HOST|MODEL_PATH'
+
 echo "--- Démarrage du serveur API FastAPI en arrière-plan ---"
 
-# Démarre le serveur de l'API et redirige TOUTE sa sortie (standard et erreur) vers un fichier api.log
+# Lance l'API et redirige ses logs vers un fichier
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
 
-# Attend quelques secondes pour laisser le temps à l'API de démarrer ou de planter
-echo "--- Attente de 5 secondes pour la stabilisation de l'API... ---"
+# Attend quelques secondes
+echo "--- Attente de 5 secondes... ---"
 sleep 5
 
-# Affiche le contenu du fichier de log de l'API pour le débogage
-echo "--- Contenu des logs de démarrage de l'API (api.log) ---"
+echo "--- Contenu des logs de l'API (api.log) ---"
+# Affiche le contenu du log, même s'il est vide
 cat api.log
-echo "--------------------------------------------------------"
+echo "--------------------------------------------"
 
+echo "--- [DEBUG] Vérification du processus API ---"
+# Vérifie si un processus écoute bien sur le port 8000
+if ss -tln | grep -q 8000; then
+    echo "SUCCÈS : Un processus API écoute bien sur le port 8000."
+else
+    echo "ERREUR : Aucun processus API ne semble tourner. L'API a probablement planté au démarrage."
+fi
 
-# Affiche un message pour indiquer le début du démarrage du dashboard
 echo "--- Démarrage du Dashboard Streamlit ---"
-
-# Démarre le dashboard Streamlit au premier plan
 streamlit run app.py --server.port 7860 --server.address 0.0.0.0
