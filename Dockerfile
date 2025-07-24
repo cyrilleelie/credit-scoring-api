@@ -17,7 +17,7 @@ COPY pyproject.toml poetry.lock ./
 # listées dans poetry.lock, sans créer d'environnement virtuel.
 RUN pip install poetry \
     && poetry config virtualenvs.create false \
-    && poetry install --no-root --no-dev
+    && poetry install --no-root --only main
 
 # Étape 5: Copier le reste du code de l'application
 # On copie tout le code source (le dossier src, etc.)
