@@ -18,8 +18,13 @@ RUN pip install --no-cache-dir poetry \
     && poetry config virtualenvs.create false \
     && poetry install --no-root --only main
 
-# Copie tout le code de l'application
+# --- CORRECTION APPLIQUÉE ICI ---
+# Copie tout le code de l'application AVANT de changer les permissions
 COPY . .
+
+# Rend le script de démarrage exécutable
+RUN chmod +x startup.sh
+# ---------------------------------
 
 # Change le propriétaire de tous les fichiers de l'application
 RUN chown -R appuser:appuser /app
@@ -29,9 +34,6 @@ USER appuser
 
 # Expose les ports pour l'API et le dashboard
 EXPOSE 8000 7860
-
-# Rend le script de démarrage exécutable
-RUN chmod +x startup.sh
 
 # Commande finale pour lancer l'application
 CMD ["./startup.sh"]
