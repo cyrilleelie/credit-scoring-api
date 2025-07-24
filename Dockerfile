@@ -2,7 +2,7 @@
 
 # Étape 1: Utiliser une image Python de base
 # On choisit une version qui correspond à notre projet (ex: 3.11)
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Étape 2: Définir le répertoire de travail dans le conteneur
 WORKDIR /app
