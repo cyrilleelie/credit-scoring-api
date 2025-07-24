@@ -8,6 +8,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Étape 3: Copier les fichiers de dépendances
+# Installe la dépendance système requise par LightGBM
+RUN apt-get update && apt-get install -y libgomp1
 # On copie uniquement ce qui est nécessaire pour installer les dépendances d'abord
 # pour profiter du cache de Docker.
 COPY pyproject.toml poetry.lock ./
