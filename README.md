@@ -171,3 +171,4 @@ Le script `locustfile.py` utilise Locust pour simuler une montée en charge et t
     ```
 2.  **Ouvrez l'interface web de Locust** dans votre navigateur à l'adresse `http://localhost:8089`.
 3.  **Configurez et démarrez un test** en spécifiant le nombre d'utilisateurs et le taux d'apparition.
+
