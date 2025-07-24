@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 import warnings
 import tempfile
 import os
@@ -12,12 +12,11 @@ from datetime import datetime, time
 import sys
 
 # --- Bloc d'initialisation du chemin pour une exécution robuste ---
-# Ajoute la racine du projet au chemin de recherche de Python
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_ROOT)
 
 from src.config import settings
-from src.database.database import get_db_engine
+from src.database.database import engine  # <-- CORRECTION: On importe l'engine directement
 from evidently import Report
 from evidently.presets import DataDriftPreset
 
@@ -27,16 +26,16 @@ warnings.filterwarnings("ignore", category=UserWarning, module='sklearn')
 
 @st.cache_resource
 def get_db_engine_cached():
-    """Crée et met en cache une connexion à la base de données."""
-    return get_db_engine()
+    """Met en cache la connexion à la base de données."""
+    return engine  # <-- CORRECTION: On retourne l'engine importé
 
 @st.cache_data
 def get_client_ids():
     """Récupère et met en cache la liste des ID clients."""
-    engine = get_db_engine_cached()
-    if engine:
+    db_engine = get_db_engine_cached() # Utilise la fonction cachée
+    if db_engine:
         try:
-            with engine.connect() as connection:
+            with db_engine.connect() as connection:
                 query = text("SELECT sk_id_curr FROM test_data ORDER BY sk_id_curr;")
                 result = connection.execute(query)
                 return [row[0] for row in result]
@@ -46,14 +45,14 @@ def get_client_ids():
 
 def generate_and_save_drift_report():
     """Génère le rapport de dérive et le sauvegarde dans la base de données."""
-    engine = get_db_engine_cached()
-    if not engine:
+    db_engine = get_db_engine_cached()
+    if not db_engine:
         st.error("Connexion à la base de données non disponible.")
         return
 
     with st.spinner("Génération du rapport en cours..."):
         try:
-            with engine.connect() as connection:
+            with db_engine.connect() as connection:
                 ref_query = text("SELECT data, target FROM training_data ORDER BY random() LIMIT 10000;")
                 reference_df_db = pd.read_sql_query(ref_query, connection)
                 
@@ -91,7 +90,7 @@ def generate_and_save_drift_report():
 
             os.unlink(tmp_path)
             
-            with engine.connect() as connection:
+            with db_engine.connect() as connection:
                 query = text("INSERT INTO drift_reports (report_timestamp, report_html) VALUES (:ts, :html);")
                 connection.execute(query, {"ts": datetime.now(), "html": html_content})
                 connection.commit()
@@ -178,10 +177,10 @@ else:
     # --- Onglet 2: Performance de l'API ---
     with tab2:
         st.header("Monitoring de Performance de l'API")
-        engine = get_db_engine_cached()
-        if engine:
+        db_engine = get_db_engine_cached()
+        if db_engine:
             try:
-                with engine.connect() as connection:
+                with db_engine.connect() as connection:
                     logs_df = pd.read_sql_query(text("SELECT * FROM api_logs;"), connection)
 
                 if not logs_df.empty:
@@ -223,10 +222,10 @@ else:
         if st.button("Générer un nouveau Rapport de Dérive", type="secondary"):
             generate_and_save_drift_report()
         st.divider()
-        engine = get_db_engine_cached()
-        if engine:
+        db_engine = get_db_engine_cached()
+        if db_engine:
             try:
-                with engine.connect() as connection:
+                with db_engine.connect() as connection:
                     reports_df = pd.read_sql_query(text("SELECT id, report_timestamp FROM drift_reports ORDER BY report_timestamp DESC;"), connection)
 
                 if not reports_df.empty:
@@ -235,7 +234,7 @@ else:
                     
                     if selected_report_display:
                         report_id = report_options[selected_report_display]
-                        with engine.connect() as connection:
+                        with db_engine.connect() as connection:
                             query = text("SELECT report_html FROM drift_reports WHERE id = :report_id;")
                             result = connection.execute(query, {"report_id": report_id}).fetchone()
                         
