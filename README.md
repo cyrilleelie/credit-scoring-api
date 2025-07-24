@@ -1,3 +1,13 @@
+---
+title: Credit Scoring Dashboard
+emoji: 📊
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: app.py
+pinned: false
+---
+
 # API de Scoring Crédit & Dashboard de Monitoring
 
 Ce projet a pour objectif de déployer un modèle de Machine Learning de scoring crédit via une API robuste (FastAPI) et de fournir un dashboard interactif (Streamlit) pour l'analyse et le monitoring en temps réel. L'ensemble de l'application est conçu pour être conteneurisable avec Docker et est supporté par une base de données PostgreSQL.
