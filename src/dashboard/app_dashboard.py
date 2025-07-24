@@ -1,4 +1,4 @@
-# src/dashboard.py
+# src/dashboard/app_dashboard.py
 
 import streamlit as st
 import pandas as pd
@@ -9,10 +9,15 @@ import warnings
 import tempfile
 import os
 from datetime import datetime, time
+import sys
 
-# Importer la configuration centralisée
+# --- Bloc d'initialisation du chemin pour une exécution robuste ---
+# Ajoute la racine du projet au chemin de recherche de Python
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
+
 from src.config import settings
-
+from src.database.database import get_db_engine
 from evidently import Report
 from evidently.presets import DataDriftPreset
 
@@ -21,20 +26,14 @@ warnings.filterwarnings("ignore", category=UserWarning, module='sklearn')
 # --- Fonctions ---
 
 @st.cache_resource
-def get_db_engine():
+def get_db_engine_cached():
     """Crée et met en cache une connexion à la base de données."""
-    try:
-        engine = create_engine(settings.database_url)
-        print("Connexion à la base de données établie pour le dashboard.")
-        return engine
-    except Exception as e:
-        st.error(f"Erreur de connexion à la base de données : {e}")
-        return None
+    return get_db_engine()
 
 @st.cache_data
 def get_client_ids():
     """Récupère et met en cache la liste des ID clients."""
-    engine = get_db_engine()
+    engine = get_db_engine_cached()
     if engine:
         try:
             with engine.connect() as connection:
@@ -47,7 +46,7 @@ def get_client_ids():
 
 def generate_and_save_drift_report():
     """Génère le rapport de dérive et le sauvegarde dans la base de données."""
-    engine = get_db_engine()
+    engine = get_db_engine_cached()
     if not engine:
         st.error("Connexion à la base de données non disponible.")
         return
@@ -83,15 +82,14 @@ def generate_and_save_drift_report():
             data_drift_report = Report(metrics=[DataDriftPreset()])
             data_drift_report_run = data_drift_report.run(reference_data=reference_data_for_drift, current_data=current_data)
             
-            # Créer un fichier temporaire, fermer le descripteur, puis lire
             fd, tmp_path = tempfile.mkstemp(suffix='.html')
-            os.close(fd)                     # <- ferme le descripteur
-            data_drift_report_run.save_html(tmp_path)       # Evidently écrit dedans
+            os.close(fd)
+            data_drift_report_run.save_html(tmp_path)
 
             with open(tmp_path, encoding='utf-8') as f:
                 html_content = f.read()
 
-            os.unlink(tmp_path)              # suppression immédiate
+            os.unlink(tmp_path)
             
             with engine.connect() as connection:
                 query = text("INSERT INTO drift_reports (report_timestamp, report_html) VALUES (:ts, :html);")
@@ -105,79 +103,68 @@ def generate_and_save_drift_report():
             st.error(f"Erreur lors de la génération du rapport : {e}")
 
 # --- Fonctions d'Authentification ---
-
 def login(username, password):
-    """Appelle l'API pour obtenir un token JWT et affiche des informations de débogage."""
+    """Appelle l'API pour obtenir un token JWT et affiche les erreurs."""
     try:
         response = requests.post(
             f"{settings.api_url}/auth",
-            data={"username": username, "password": password}
+            data={"username": username, "password": password},
+            timeout=10
         )
-
         if response.status_code == 200:
             st.session_state['token'] = response.json()['access_token']
             st.success("Connexion réussie !")
             st.rerun()
         else:
-            # On affiche une erreur plus détaillée dans l'interface
-            error_detail = response.json().get('detail', 'Erreur inconnue.')
-            st.error(f"Échec de l'authentification : {error_detail}")
-
-    except requests.exceptions.ConnectionError:
-        st.error("Impossible de se connecter à l'API. Assurez-vous qu'elle est en cours d'exécution.")
-    except Exception as e:
-        st.error(f"Une erreur inattendue est survenue : {e}")
+            st.error(f"Échec de l'authentification. Détail de l'erreur : {response.text}")
+            
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erreur de communication avec l'API. Détail : {e}")
 
 def logout():
-    """Déconnecte l'utilisateur en supprimant le token de la session."""
+    """Déconnecte l'utilisateur."""
     if 'token' in st.session_state:
         del st.session_state['token']
     st.success("Vous avez été déconnecté.")
 
 # --- Interface Principale ---
-
 st.set_page_config(layout="wide", page_title="Dashboard de Scoring Crédit")
 
 # --- Écran de Connexion ---
 if 'token' not in st.session_state:
     st.title("Connexion au Dashboard de Scoring")
     with st.form("login_form"):
-        username = st.text_input("Nom d'utilisateur", value=settings.api_user)
-        password = st.text_input("Mot de passe", type="password", value=settings.api_password)
+        username = st.text_input("Nom d'utilisateur", value=settings.api_user or "")
+        password = st.text_input("Mot de passe", type="password")
         submitted = st.form_submit_button("Se connecter")
         if submitted:
             login(username, password)
 else:
     # --- Dashboard Principal (si connecté) ---
-    st.sidebar.title(f"Bienvenue, user_test")
+    st.sidebar.title(f"Bienvenue, {settings.api_user}")
     st.sidebar.button("Se déconnecter", on_click=logout)
     
     st.title("Dashboard de Scoring Crédit - Prêt à Dépenser")
 
-    # --- Onglets ---
     tab1, tab2, tab3 = st.tabs(["Prédiction de Score", "Performance de l'API", "Analyse de Dérive"])
 
     # --- Onglet 1: Prédiction de Score ---
     with tab1:
         st.header("Calculer le score d'un client")
-        
         client_ids = get_client_ids()
         if not client_ids:
             st.warning("Aucun ID client trouvé dans la base de données.")
         else:
             selected_client_id = st.selectbox("Sélectionnez un ID Client", options=client_ids)
-            
             if st.button("Obtenir le Score", type="primary"):
                 if selected_client_id:
                     with st.spinner("Appel de l'API en cours..."):
                         try:
                             headers = {"Authorization": f"Bearer {st.session_state['token']}"}
                             response = requests.post(f"{settings.api_url}/predict/{selected_client_id}", headers=headers)
-                            
                             if response.status_code == 200:
                                 data = response.json()
                                 st.success("Prédiction reçue avec succès !")
-                                
                                 col1, col2 = st.columns(2)
                                 with col1:
                                     st.metric(label="Score de Risque", value=f"{data['prediction_probability']:.2%}")
@@ -191,8 +178,7 @@ else:
     # --- Onglet 2: Performance de l'API ---
     with tab2:
         st.header("Monitoring de Performance de l'API")
-        
-        engine = get_db_engine()
+        engine = get_db_engine_cached()
         if engine:
             try:
                 with engine.connect() as connection:
@@ -200,12 +186,10 @@ else:
 
                 if not logs_df.empty:
                     logs_df['request_timestamp'] = pd.to_datetime(logs_df['request_timestamp']).dt.tz_localize(None)
-
                     st.subheader("Filtres de performance")
                     col_filter1, col_filter2 = st.columns(2)
                     min_date = logs_df['request_timestamp'].min().date()
                     max_date = logs_df['request_timestamp'].max().date()
-                    
                     with col_filter1:
                         start_date = st.date_input("Date de début", min_date, min_value=min_date, max_value=max_date)
                     with col_filter2:
@@ -213,7 +197,6 @@ else:
 
                     start_datetime = datetime.combine(start_date, time.min)
                     end_datetime = datetime.combine(end_date, time.max)
-
                     filtered_logs = logs_df[(logs_df['request_timestamp'] >= start_datetime) & (logs_df['request_timestamp'] <= end_datetime)]
 
                     st.divider()
@@ -223,10 +206,8 @@ else:
                         col1.metric("Nombre de requêtes", f"{len(filtered_logs)}")
                         col2.metric("Temps d'inférence moyen", f"{filtered_logs['inference_time_ms'].mean():.2f} ms")
                         col3.metric("Taux de succès", f"{(filtered_logs['http_status_code'] == 200).mean():.2%}")
-
                         st.subheader("Évolution des temps d'inférence")
                         st.line_chart(filtered_logs.set_index('request_timestamp')['inference_time_ms'])
-                        
                         st.subheader("Détail des appels sur la période")
                         st.dataframe(filtered_logs, use_container_width=True)
                     else:
@@ -239,13 +220,10 @@ else:
     # --- Onglet 3: Analyse de Dérive ---
     with tab3:
         st.header("Analyse de la Dérive des Données (Data Drift)")
-        
         if st.button("Générer un nouveau Rapport de Dérive", type="secondary"):
             generate_and_save_drift_report()
-
         st.divider()
-        
-        engine = get_db_engine()
+        engine = get_db_engine_cached()
         if engine:
             try:
                 with engine.connect() as connection:
