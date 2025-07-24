@@ -4,6 +4,10 @@ FROM python:3.12-slim
 # Définit le répertoire de travail dans le conteneur
 WORKDIR /app
 
+# --- CORRECTION APPLIQUÉE ICI ---
+# Indique à Streamlit d'utiliser un dossier local pour sa configuration
+ENV STREAMLIT_HOME=/app/.streamlit
+
 # Installe la dépendance système requise par LightGBM
 RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
 
@@ -21,6 +25,5 @@ COPY . .
 # Expose le port standard de Hugging Face
 EXPOSE 7860
 
-# --- COMMANDE DE DÉMARRAGE CORRIGÉE ---
 # Lance Streamlit sur le port 7860, attendu par Hugging Face
 CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
