@@ -4,12 +4,11 @@ FROM python:3.12-slim
 # Définit le répertoire de travail dans le conteneur
 WORKDIR /app
 
-# --- CORRECTION APPLIQUÉE ICI ---
-# Indique à Streamlit d'utiliser un dossier local pour sa configuration
-ENV STREAMLIT_HOME=/app/.streamlit
+# Installe les dépendances système requises (pour LightGBM et Git LFS)
+RUN apt-get update && apt-get install -y libgomp1 git-lfs && rm -rf /var/lib/apt/lists/*
 
-# Installe la dépendance système requise par LightGBM
-RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
+# Crée un utilisateur non-privilégié pour exécuter l'application
+RUN useradd -ms /bin/bash appuser
 
 # Copie les fichiers de configuration de Poetry
 COPY pyproject.toml poetry.lock ./
@@ -22,8 +21,17 @@ RUN pip install --no-cache-dir poetry \
 # Copie tout le code de l'application
 COPY . .
 
-# Expose le port standard de Hugging Face
-EXPOSE 7860
+# Change le propriétaire de tous les fichiers de l'application
+RUN chown -R appuser:appuser /app
 
-# Lance Streamlit sur le port 7860, attendu par Hugging Face
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
+# Passe à l'utilisateur non-privilégié
+USER appuser
+
+# Expose les ports pour l'API et le dashboard
+EXPOSE 8000 7860
+
+# Rend le script de démarrage exécutable
+RUN chmod +x startup.sh
+
+# Commande finale pour lancer l'application
+CMD ["./startup.sh"]
