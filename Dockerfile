@@ -15,10 +15,11 @@ USER appuser
 COPY --chown=appuser:appuser pyproject.toml poetry.lock ./
 
 # Installe les dépendances Python avec Poetry
+# On appelle poetry via "python -m poetry" pour éviter les problèmes de PATH
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir poetry \
-    && poetry config virtualenvs.create false \
-    && poetry install --no-root --only main
+    && python -m poetry config virtualenvs.create false \
+    && python -m poetry install --no-root --only main
 
 # Copie tout le reste du code de l'application
 COPY --chown=appuser:appuser . .
