@@ -19,8 +19,8 @@ cat api.log
 echo "--------------------------------------------"
 
 echo "--- [DEBUG] Vérification du processus API ---"
-# Vérifie si un processus écoute bien sur le port 8000
-if ss -tln | grep -q 8000; then
+# Vérifie si un processus écoute bien sur le port 8000 avec netstat
+if netstat -tln | grep -q 8000; then
     echo "SUCCÈS : Un processus API écoute bien sur le port 8000."
 else
     echo "ERREUR : Aucun processus API ne semble tourner. L'API a probablement planté au démarrage."
