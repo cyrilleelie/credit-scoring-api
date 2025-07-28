@@ -1,17 +1,13 @@
 #!/bin/bash
 
-# Active le mode "exit on error" pour arrêter le script si une commande échoue.
-set -e
-
+# Lance le serveur API FastAPI en arrière-plan et redirige sa sortie (stdout & stderr) vers un fichier
 echo "--- Démarrage du serveur API FastAPI en arrière-plan ---"
-# Lance l'API et redirige sa sortie (standard et erreur) vers un fichier de log.
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000 > api.log 2>&1 &
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &> api.log &
 
+# Lance un processus en arrière-plan pour afficher en continu les logs de l'API
 echo "--- Streaming des logs de l'API en arrière-plan ---"
-# Lance un processus en arrière-plan qui affiche en continu le contenu du fichier
-# de log de l'API. Cela nous permettra de voir les erreurs en temps réel.
 tail -f api.log &
 
+# Lance le Dashboard Streamlit en premier plan (ce sont ses logs que nous verrons principalement)
 echo "--- Démarrage du Dashboard Streamlit en premier plan ---"
-# Lance le dashboard. Ce processus reste en premier plan.
-streamlit run app.py --server.port 7860 --server.address 0.0.0.0
+streamlit run app.py --server.port=7860 --server.address=0.0.0.0
