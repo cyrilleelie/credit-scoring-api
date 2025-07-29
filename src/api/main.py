@@ -2,6 +2,8 @@
 
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
+# --- CORRECTION APPLIQUÉE ICI ---
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import joblib
@@ -24,7 +26,17 @@ import os
 app = FastAPI(title="API de Scoring Crédit", version="1.0")
 model = joblib.load(settings.model_path)
 
-# --- Dépendances ---
+# --- CONFIGURATION DU MIDDLEWARE CORS ---
+# Permet à votre dashboard local de communiquer avec l'API sur Hugging Face.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Autorise toutes les origines (pour le développement)
+    allow_credentials=True,
+    allow_methods=["*"],  # Autorise toutes les méthodes (GET, POST, etc.)
+    allow_headers=["*"],  # Autorise tous les en-têtes
+)
+
+# --- Dépendances (le reste du fichier est identique) ---
 async def get_current_active_user(token: str = Depends(security.oauth2_scheme), db: Session = Depends(get_db)) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
