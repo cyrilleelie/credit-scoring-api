@@ -1,11 +1,11 @@
 ---
 title: Credit Scoring API
 emoji: 🤖
-colorFrom: indigo
-colorTo: green
+colorFrom: green
+colorTo: blue
 sdk: docker
-exposed_ports:
-  - 8000
+app_port: 8000
+pinned: false
 ---
 
 # API de Scoring Crédit & Dashboard de Monitoring
