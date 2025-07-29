@@ -10,12 +10,12 @@ import numpy as np
 import time
 import json
 from typing import List
-import traceback # <-- Ajout pour un logging d'erreur détaillé
+import traceback
 
 # On importe tous les composants nécessaires depuis nos modules locaux
 from src.database import models, schemas
 from src.api import security
-from src.database.database import get_db, engine
+from src.database.database import get_db
 from src.config import settings
 from evidently import Report
 from evidently.presets import DataDriftPreset
@@ -29,28 +29,12 @@ app = FastAPI(title="API de Scoring Crédit", version="1.0")
 model = joblib.load(settings.model_path)
 
 # --- Dépendances ---
-async def get_current_active_user(
-    token: str = Depends(security.oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = security.jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = schemas.TokenData(username=username)
-    except security.JWTError:
-        raise credentials_exception
-
-    user = security.get_user(db, username=token_data.username)
-    if user is None or user.disabled:
-        raise credentials_exception
-    return user
+# NOTE : La dépendance get_current_active_user est temporairement modifiée pour le débogage
+async def get_current_active_user(token: str = Depends(security.oauth2_scheme)):
+    """
+    Dépendance de débogage qui retourne un utilisateur factice sans vérifier la BDD.
+    """
+    return models.User(username="user_test", disabled=False)
 
 
 # --- Fonctions utilitaires ---
@@ -72,21 +56,21 @@ def read_root():
 @app.post("/auth", response_model=schemas.Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db) # On garde la dépendance pour la signature
 ):
-    user = security.authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    """
+    Endpoint de débogage pour s'authentifier.
+    Retourne un token valide sans vérifier la base de données.
+    """
+    # --- BLOC DE DÉBOGAGE ---
+    # On simule une authentification réussie pour n'importe quel utilisateur/mdp
+    print("DEBUG: Authentification simulée, la base de données n'est pas appelée.")
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     access_token = security.create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": form_data.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
-
+    # --- FIN DU BLOC DE DÉBOGAGE ---
 
 @app.post("/predict/{client_id}", response_model=schemas.PredictionResponse)
 def predict(
@@ -95,6 +79,7 @@ def predict(
     current_user: models.User = Depends(get_current_active_user)
 ):
     start_time = time.time()
+    # Utilise le nouveau nom de classe pour les données de test
     db_client = db.query(models.ClientDataForTest).filter(models.ClientDataForTest.sk_id_curr == client_id).first()
     if db_client is None:
         raise HTTPException(status_code=404, detail=f"Client ID {client_id} non trouvé.")
@@ -176,8 +161,6 @@ def generate_drift_report(db: Session = Depends(get_db), current_user: models.Us
         reference_data = pd.DataFrame(list(reference_df['data']))
         reference_data['TARGET'] = reference_df['target']
         
-        # --- LIGNE CORRIGÉE ---
-        # Les données sont déjà des dictionnaires, pas besoin de json.loads
         current_data = pd.DataFrame([row[0] for row in current_logs_df.itertuples(index=False)])
 
         if 'TARGET' in reference_data.columns:
@@ -187,21 +170,15 @@ def generate_drift_report(db: Session = Depends(get_db), current_user: models.Us
         
         data_drift_report = Report(metrics=[DataDriftPreset()])
         data_drift_report_run = data_drift_report.run(reference_data=reference_data[common_cols], current_data=current_data[common_cols])
-        
-        # Créer un fichier temporaire, fermer le descripteur, puis lire
+
+        # Utilisation de tempfile.mkstemp pour une meilleure compatibilité Windows
         fd, tmp_path = tempfile.mkstemp(suffix=".html")
         try:
-            # On ferme le descripteur de bas niveau pour libérer le fichier
             os.close(fd)
-            
-            # Evidently peut maintenant écrire dans le fichier
             data_drift_report_run.save_html(tmp_path)
-            
-            # On lit le contenu du fichier
             with open(tmp_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
         finally:
-            # On s'assure que le fichier temporaire est supprimé
             os.unlink(tmp_path)
         
         new_report = models.DriftReport(report_timestamp=datetime.now(), report_html=html_content)
