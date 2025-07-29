@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """Génère l'URL de connexion à la base de données."""
         # Encode le mot de passe pour qu'il soit sûr dans une URL
-        return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
+        return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}?sslmode=require"
 
     # Configuration pour Pydantic V2
     model_config = SettingsConfigDict(
