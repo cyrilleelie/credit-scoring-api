@@ -1,35 +1,32 @@
-# Utilise une image Python 3.12 légère
+# 1. Utiliser une image Python de base
 FROM python:3.12-slim
 
-# Définit le répertoire de travail dans le conteneur
+# 2. Mettre à jour les paquets et installer les dépendances système requises
+RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
+
+# 3. Définir le répertoire de travail
 WORKDIR /app
 
-# Installe les dépendances système requises
-RUN apt-get update && apt-get install -y libgomp1 curl
+# 4. Créer un utilisateur non-privilégié pour la sécurité
+RUN useradd -m -u 1000 appuser
 
-# Copie les fichiers de configuration de Poetry
+# 5. Copier les fichiers de configuration et installer les dépendances en tant que root
 COPY pyproject.toml poetry.lock ./
-
-# Installe les dépendances Python avec les droits root
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir poetry \
     && python -m poetry config virtualenvs.create false \
     && python -m poetry install --no-root --only main
 
-# Copie tout le reste du code de l'application
+# 6. Copier le reste du code de l'application
 COPY . .
-
-# Crée l'utilisateur non-privilégié
-RUN useradd -m -u 1000 appuser
-
-# Change le propriétaire de tous les fichiers pour le nouvel utilisateur
+# S'assurer que le nouvel utilisateur est propriétaire des fichiers
 RUN chown -R appuser:appuser /app
 
-# Bascule vers l'utilisateur non-privilégié pour l'exécution
+# 7. Changer d'utilisateur pour l'exécution
 USER appuser
 
-# Rend le script de démarrage exécutable
-RUN chmod +x startup.sh
+# 8. Exposer le port de l'API
+EXPOSE 8000
 
-# Commande pour lancer l'application
-CMD ["./startup.sh"]
+# 9. Commande pour lancer le serveur API
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
