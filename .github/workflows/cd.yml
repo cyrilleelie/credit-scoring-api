@@ -1,0 +1,34 @@
+# .github/workflows/cd.yml
+
+name: CD - Deploy to Hugging Face Spaces
+
+# Déclencheurs du workflow
+on:
+  # Se déclenche uniquement lorsqu'une nouvelle "release" est publiée sur GitHub
+  release:
+    types: [published]
+
+jobs:
+  deploy-to-hf-space:
+    runs-on: ubuntu-latest
+    steps:
+      # Étape 1: Récupérer le code de la release, en incluant les fichiers LFS
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Nécessaire pour avoir l'historique complet
+          lfs: true
+
+      # Étape 2: Pousser le code vers le Space Hugging Face
+      - name: Push to Hugging Face Spaces
+        env:
+          # Le token est un secret que vous devez créer dans les paramètres de votre dépôt GitHub
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Ajoute le remote vers le Space HF en utilisant le token pour l'authentification
+          # Remplacez l'URL par celle de votre propre Space
+          git remote add hf https://user:${HF_TOKEN}@huggingface.co/spaces/cyrille-elie/credit-scoring-dashboard
+          
+          # Pousse la branche actuelle (celle de la release) vers la branche 'main' du Space
+          # Le --force est nécessaire pour écraser le contenu précédent du Space
+          git push --force hf HEAD:main
