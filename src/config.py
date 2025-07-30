@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     model_path: str
     
     # --- Chemins vers les données (optionnels) ---
-    train_data_file: str
-    test_data_file: str
+    train_data_file: Optional[str] = None
+    test_data_file: Optional[str] = None
 
     @property
     def database_url(self) -> str:
