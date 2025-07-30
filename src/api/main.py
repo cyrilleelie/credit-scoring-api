@@ -107,7 +107,7 @@ def predict(
             request_timestamp=datetime.now(),
             client_id=client_id,
             input_data=input_data_serializable,
-            prediction_probab=prediction_proba,
+            prediction_proba=prediction_proba,
             prediction_decision=decision,
             inference_time_ms=inference_time_ms,
             http_status_code=200
