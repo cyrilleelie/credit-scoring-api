@@ -75,6 +75,9 @@ jobs:
           API_PASSWORD: ${{ secrets.API_PASSWORD }}
           DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
           MODEL_PATH: ${{ vars.MODEL_PATH }}
+          TRAIN_DATA_FILE: "tests/fixtures/sample.train.csv"
+          TEST_DATA_FILE: "tests/fixtures/sample_test.csv"
+
         run: |
           poetry run python -m src.scripts.init_db \
             --train-file tests/fixtures/sample_train.csv \
