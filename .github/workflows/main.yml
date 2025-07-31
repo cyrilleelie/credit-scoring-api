@@ -1,44 +1,36 @@
 # Nom du workflow qui apparaîtra dans l'onglet "Actions" de GitHub
-name: CI - Test et Build de l'API Scoring
+name: CI/CD - Test et Build de l'API Scoring
 
 # Déclencheurs du workflow
 on:
+  # Se déclenche à chaque push sur la branche develop
   push:
     branches: [ develop ]
+  # Se déclenche aussi à chaque Pull Request vers la branche develop
   pull_request:
     branches: [ develop ]
 
 # Liste des jobs à exécuter
 jobs:
+  # Premier job : lancer les tests
   test:
+    # Le type de machine sur lequel le job va s'exécuter
     runs-on: ubuntu-latest
     
-    env:
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      API_URL: "http://127.0.0.1:8000"
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      ALGORITHM: ${{ vars.ALGORITHM }}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}
-      API_USER: ${{ secrets.API_USER }}
-      API_PASSWORD: ${{ secrets.API_PASSWORD }}
-      DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
-      MODEL_PATH: ${{ vars.MODEL_PATH }}
-      TRAIN_DATA_FILE: "tests/fixtures/sample_train.csv"
-      TEST_DATA_FILE: "tests/fixtures/sample_test.csv"
-
     services:
+      # On définit un service nommé 'postgres'
       postgres:
+        # On utilise une image Docker PostgreSQL officielle et légère
         image: postgres:13-alpine
+        # On configure le conteneur avec des variables d'environnement
         env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ vars.DB_NAME }}
+        # On s'assure que le port 5432 du conteneur est accessible sur le localhost du serveur
         ports:
-          - 5432:5432
+          - ${{ vars.DB_PORT }}:5432
+        # Healthcheck : attend que la BDD soit prête avant de lancer les étapes suivantes
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -46,32 +38,106 @@ jobs:
           --health-retries 5
 
     steps:
+      # Étape 1: Récupérer le code de votre dépôt
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          lfs: true
 
-      - name: Set up Python and Poetry
+      # Étape 2: Mettre en place Python et Poetry
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-      - run: pip install poetry
+      - name: Install Poetry
+        run: pip install poetry
 
+      # Étape 3: Installer les dépendances
+      # --- CORRECTION APPLIQUÉE ICI ---
+      # On ajoute --no-root pour n'installer que les dépendances, pas le projet lui-même.
       - name: Install dependencies
         run: poetry install --no-root
 
-      - name: Initialize Database with test fixtures
+      # Étape 4: Initialiser la base de données
+      - name: Initialize Database
+        env:
+          # On fournit au script les mêmes identifiants que ceux du service
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          # Fournissez des valeurs par défaut pour les autres variables requises
+          # pour que le script puisse démarrer.
+          API_URL: ${{ vars.API_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALGORITHM: ${{ vars.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          API_USER: ${{ secrets.API_USER }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
+          DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
+          MODEL_PATH: ${{ vars.MODEL_PATH }}
         run: |
-          poetry run python -m src.scripts.init_db --train-file ${{ env.TRAIN_DATA_FILE }} --test-file ${{ env.TEST_DATA_FILE }}
+          poetry run python -m src.scripts.init_db \
+            --train-file tests/fixtures/sample_train.csv \
+            --test-file tests/fixtures/sample_test.csv
 
-      # --- ÉTAPE DE DÉBOGAGE ---
-      # On lance l'API en premier plan pour voir sa sortie complète.
-      # Si elle crashe, on verra la trace d'erreur.
-      # Si elle démarre, le job va "tourner" jusqu'à son timeout, ce qui est un succès pour ce test.
-      - name: Debug API Server Startup
-        run: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+      # Étape 5: Démarrer le serveur API
+      - name: Start API Server
+        env:
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALGORITHM: ${{ vars.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          API_USER: ${{ secrets.API_USER }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
+          DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
+          MODEL_PATH: ${{ vars.MODEL_PATH }}
+          API_URL: "http://127.0.0.1:8000" # URL non utilisée par le serveur lui-même
+        run: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
 
-  # Le job de build est temporairement désactivé pour se concentrer sur le débogage
-  # build_docker:
-  #   needs: test
-  #   ...
+      # Étape 6: Lancer les tests avec pytest
+      - name: Run tests
+        env:
+          # --- SECRETS ---
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          API_USER: ${{ secrets.API_USER }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+
+          # --- VARIABLES ---
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          API_URL: ${{ vars.API_URL }}
+          ALGORITHM: ${{ vars.ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
+          MODEL_PATH: ${{ vars.MODEL_PATH }}
+        run: |
+          sleep 10 # Donne le temps au serveur de démarrer
+          poetry run pytest
+
+  # Deuxième job : construire l'image Docker
+  build_docker:
+    # Ce job ne se lancera que si le job 'test' a réussi
+    needs: test
+    runs-on: ubuntu-latest
+    
+    # Ce job ne se lancera QUE sur un push vers 'develop', pas sur les Pull Requests
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+
+    steps:
+      # Étape 1: Récupérer le code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Étape 2: Construire l'image Docker
+      # Cette étape ne pousse pas l'image, elle la construit seulement pour vérifier que le Dockerfile est correct.
+      # Le déploiement sur un registre (Docker Hub, GHCR) sera une étape ultérieure.
+      - name: Build Docker image
+        run: docker build -t scoring-api:${{ github.sha }} .
+
