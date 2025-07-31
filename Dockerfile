@@ -1,35 +1,32 @@
-# Dockerfile
+# 1. Utiliser une image Python de base
+FROM python:3.12-slim
 
-# Étape 1: Utiliser une image Python de base
-# On choisit une version qui correspond à notre projet (ex: 3.11)
-FROM python:3.11-slim
+# 2. Mettre à jour les paquets et installer les dépendances système requises
+RUN apt-get update && apt-get install -y libgomp1 && rm -rf /var/lib/apt/lists/*
 
-# Étape 2: Définir le répertoire de travail dans le conteneur
+# 3. Définir le répertoire de travail
 WORKDIR /app
 
-# Étape 3: Copier les fichiers de dépendances
-# On copie uniquement ce qui est nécessaire pour installer les dépendances d'abord
-# pour profiter du cache de Docker.
+# 4. Créer un utilisateur non-privilégié pour la sécurité
+RUN useradd -m -u 1000 appuser
+
+# 5. Copier les fichiers de configuration et installer les dépendances en tant que root
 COPY pyproject.toml poetry.lock ./
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir poetry \
+    && python -m poetry config virtualenvs.create false \
+    && python -m poetry install --no-root --only main
 
-# Étape 4: Installer Poetry et les dépendances du projet
-# On installe Poetry, puis on l'utilise pour installer les bibliothèques
-# listées dans poetry.lock, sans créer d'environnement virtuel.
-RUN pip install poetry \
-    && poetry config virtualenvs.create false \
-    && poetry install --no-root --no-dev
-
-# Étape 5: Copier le reste du code de l'application
-# On copie tout le code source (le dossier src, etc.)
+# 6. Copier le reste du code de l'application
 COPY . .
+# S'assurer que le nouvel utilisateur est propriétaire des fichiers
+RUN chown -R appuser:appuser /app
 
-# Étape 6: Exposer les ports
-# On indique que notre application écoutera sur les ports 8000 (pour l'API)
-# et 8501 (pour le dashboard).
+# 7. Changer d'utilisateur pour l'exécution
+USER appuser
+
+# 8. Exposer le port de l'API
 EXPOSE 8000
-EXPOSE 8501
 
-# Étape 7: Commande de démarrage
-# Cette commande sera exécutée au lancement du conteneur.
-# On utilise un petit script shell pour lancer les deux services en parallèle.
-CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port 8000 & streamlit run app.py --server.port 8501 --server.address 0.0.0.0"]
+# 9. Commande pour lancer le serveur API
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

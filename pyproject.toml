@@ -1,45 +1,41 @@
-[project]
+[tool.poetry]
 name = "credit-scoring-api"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Cyrille Elie",email = "cyrille.elie@gmail.com"}
-]
+authors = ["Cyrille Elie <cyrille.elie@gmail.com>"]
 readme = "README.md"
-requires-python = ">=3.12,<4.0"
-dependencies = [
-    "numpy (>=2.2.6,<2.3)",
-    "pandas (>=2.2.0,<2.3.0)",
-    "lightgbm (>=4.6.0,<5.0.0)",
-    "scikit-learn (>=1.7.0,<2.0.0)",
-<<<<<<< HEAD
-    "mlflow (>=2.22.1,<3.0.0)",
-    "optuna (>=4.3.0,<5.0.0)",
-    "optuna-integration (>=4.3.0,<5.0.0)",
-    "ipywidgets (>=8.0.0,<9.0.0)",
-    "shap (>=0.47.2,<0.48.0)",
-=======
->>>>>>> feature/deployment
-    "fastapi[all] (>=0.116.1,<0.117.0)",
-    "uvicorn[standard] (>=0.35.0,<0.36.0)",
-    "psycopg2-binary (>=2.9.10,<3.0.0)",
-    "sqlalchemy (>=2.0.41,<3.0.0)",
-    "streamlit (>=1.47.0,<2.0.0)",
-    "requests (>=2.32.4,<3.0.0)",
-    "passlib[bcrypt] (>=1.7.4,<2.0.0)",
-    "python-jose[cryptography] (>=3.5.0,<4.0.0)",
-    "pydantic-settings (>=2.10.1,<3.0.0)",
-    "evidently (>=0.7.11,<0.8.0)",
-    "bcrypt (<4.0)",
-    "locust (>=2.37.14,<3.0.0)",
-]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+numpy = "<2.3,>=2.2.6"
+pandas = "<2.3.0,>=2.2.0"
+lightgbm = "<5.0.0,>=4.6.0"
+scikit-learn = "1.7.0"
+fastapi = {extras = ["all"], version = "<0.117.0,>=0.116.1"}
+uvicorn = {extras = ["standard"], version = "<0.36.0,>=0.35.0"}
+psycopg2-binary = "<3.0.0,>=2.9.10"
+sqlalchemy = "<3.0.0,>=2.0.41"
+streamlit = "<2.0.0,>=1.47.0"
+requests = "<3.0.0,>=2.32.4"
+passlib = {extras = ["bcrypt"], version = "<2.0.0,>=1.7.4"}
+python-jose = {extras = ["cryptography"], version = "<4.0.0,>=3.5.0"}
+pydantic-settings = "<3.0.0,>=2.10.1"
+evidently = "<0.8.0,>=0.7.11"
+bcrypt = "<4.0"
+locust = "<3.0.0,>=2.37.14"
 
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
 pytest-cov = "^6.2.1"
+requests-mock = "^1.12.1"
 
+[tool.pytest.ini_options]
+pythonpath = "."
+
+[tool.coverage.run]
+source = ["src"]
