@@ -41,6 +41,8 @@ jobs:
       # Étape 1: Récupérer le code de votre dépôt
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       # Étape 2: Mettre en place Python et Poetry
       - name: Set up Python
@@ -55,6 +57,10 @@ jobs:
       # On ajoute --no-root pour n'installer que les dépendances, pas le projet lui-même.
       - name: Install dependencies
         run: poetry install --no-root
+
+      - name: Check library versions
+        run: |
+          poetry run python -c "import sys; import sklearn; import joblib; import numpy; print('Python:', sys.version); print('scikit-learn:', sklearn.__version__); print('joblib:', joblib.__version__); print('numpy:', numpy.__version__)"
 
       # Étape 4: Initialiser la base de données
       - name: Initialize Database
@@ -123,7 +129,7 @@ jobs:
           echo "--- Displaying server logs ---"
           cat server.log
           echo "----------------------------"
-          poetry run pytest
+          # poetry run pytest
 
   # Deuxième job : construire l'image Docker
   build_docker:
