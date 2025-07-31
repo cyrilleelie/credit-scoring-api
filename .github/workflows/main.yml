@@ -129,7 +129,7 @@ jobs:
           echo "--- Displaying server logs ---"
           cat server.log
           echo "----------------------------"
-          # poetry run pytest
+          poetry run pytest
 
   # Deuxième job : construire l'image Docker
   build_docker:
