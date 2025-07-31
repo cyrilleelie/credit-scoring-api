@@ -118,7 +118,7 @@ jobs:
           DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
           MODEL_PATH: ${{ vars.MODEL_PATH }}
         run: |
-          sleep 10 # Donne le temps au serveur de démarrer
+          sleep 30 # Donne le temps au serveur de démarrer
           poetry run pytest
 
   # Deuxième job : construire l'image Docker
