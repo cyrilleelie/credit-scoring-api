@@ -1,59 +1,68 @@
 # tests/test_dashboard.py
 
 import pytest
-from unittest.mock import MagicMock, patch
 import streamlit as st
+from unittest.mock import patch
 
-# On importe la fonction à tester
+# --- CORRECTION APPLIQUÉE ICI ---
+# On importe la fonction avec son nom correct
 from src.dashboard.app_dashboard import get_client_ids
+from src.config import settings
 
-# --- Fixture pour nettoyer le cache avant chaque test ---
+# --- Fixture pour nettoyer le cache de Streamlit avant chaque test ---
 @pytest.fixture(autouse=True)
 def clear_streamlit_cache():
-    """
-    Fixture qui s'exécute automatiquement avant chaque test de ce module
-    pour nettoyer le cache de Streamlit et garantir l'isolation des tests.
-    """
+    """Garantit que les tests sont isolés les uns des autres."""
     st.cache_data.clear()
     st.cache_resource.clear()
-    yield  # Le test s'exécute ici
+    yield
 
-def test_get_client_ids_success():
+def test_get_client_ids_success(requests_mock):
     """
     Teste que la fonction get_client_ids retourne une liste d'entiers
-    quand la base de données répond correctement.
+    quand l'API répond correctement.
     """
     # 1. Préparation (Arrange)
-    # On crée un faux résultat de base de données
-    mock_db_result = [(100001,), (100002,), (100003,)]
+    # On simule la réponse de l'API
+    expected_ids = [100001, 100002, 100003]
+    requests_mock.get(f"{settings.api_url}/clients", json=expected_ids, status_code=200)
     
-    # On crée un "mock" pour simuler l'engine de la base de données
-    mock_engine = MagicMock()
-    mock_engine.connect.return_value.__enter__.return_value.execute.return_value = mock_db_result
-
-    # 2. Action (Act)
-    # On utilise "patch" pour remplacer temporairement get_db_engine par notre mock
-    with patch('src.dashboard.app_dashboard.get_db_engine', return_value=mock_engine):
+    # On simule la présence d'un token dans la session Streamlit
+    with patch('streamlit.session_state', {'token': 'fake_token'}):
+        # 2. Action (Act)
+        # --- CORRECTION APPLIQUÉE ICI ---
         client_ids = get_client_ids()
 
     # 3. Vérification (Assert)
-    assert client_ids == [100001, 100002, 100003]
-    # On vérifie que la fonction de connexion a bien été appelée
-    mock_engine.connect.assert_called_once()
+    assert client_ids == expected_ids
 
-def test_get_client_ids_db_error():
+def test_get_client_ids_api_error(requests_mock):
     """
-    Teste que la fonction retourne une liste vide en cas d'erreur de la BDD.
+    Teste que la fonction retourne une liste vide en cas d'erreur 500 de l'API.
     """
     # 1. Préparation (Arrange)
-    # On configure le mock pour qu'il lève une exception
-    mock_engine = MagicMock()
-    mock_engine.connect.side_effect = Exception("Erreur de connexion BDD")
+    # On simule une erreur serveur de l'API
+    requests_mock.get(f"{settings.api_url}/clients", status_code=500, text="Internal Server Error")
     
-    # 2. Action (Act)
-    with patch('src.dashboard.app_dashboard.get_db_engine', return_value=mock_engine):
+    with patch('streamlit.session_state', {'token': 'fake_token'}):
+        # 2. Action (Act)
+        # --- CORRECTION APPLIQUÉE ICI ---
         client_ids = get_client_ids()
-        
+
     # 3. Vérification (Assert)
     # La fonction doit retourner une liste vide et ne pas planter
+    assert client_ids == []
+
+def test_get_client_ids_unauthorized():
+    """
+    Teste que la fonction retourne une liste vide si l'utilisateur n'est pas authentifié.
+    """
+    # 1. Préparation (Arrange)
+    # On s'assure qu'il n'y a pas de token dans la session
+    with patch('streamlit.session_state', {}):
+        # 2. Action (Act)
+        # --- CORRECTION APPLIQUÉE ICI ---
+        client_ids = get_client_ids()
+
+    # 3. Vérification (Assert)
     assert client_ids == []
