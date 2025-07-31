@@ -99,30 +99,26 @@ jobs:
         run: poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
 
       # Étape 6: Lancer les tests avec pytest
-      - name: Run tests against the live API
+      - name: Run tests
         env:
-          API_URL: "http://127.0.0.1:8000"
-          API_USER: ${{ secrets.API_USER }}
-          API_PASSWORD: ${{ secrets.API_PASSWORD }}
-          DB_HOST: localhost
-          DB_PORT: 5432
+          # --- SECRETS ---
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ vars.DB_NAME }}
+          API_USER: ${{ secrets.API_USER }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+
+          # --- VARIABLES ---
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          API_URL: ${{ vars.API_URL }}
           ALGORITHM: ${{ vars.ALGORITHM }}
           ACCESS_TOKEN_EXPIRE_MINUTES: ${{ vars.ACCESS_TOKEN_EXPIRE_MINUTES }}
           DECISION_THRESHOLD: ${{ vars.DECISION_THRESHOLD }}
           MODEL_PATH: ${{ vars.MODEL_PATH }}
-          TRAIN_DATA_FILE: "tests/fixtures/sample.train.csv"
-          TEST_DATA_FILE: "tests/fixtures/sample_test.csv"
         run: |
-          # --- CORRECTION APPLIQUÉE ICI ---
-          # Boucle de vérification qui attend que l'API soit prête, avec un timeout de 30s
-          echo "Waiting for API to be ready..."
-          timeout 30s bash -c 'until curl -s http://127.0.0.1:8000/ > /dev/null; do echo "API not up yet, sleeping..."; sleep 2; done'
-          echo "API is ready. Running tests."
-          
+          sleep 10 # Donne le temps au serveur de démarrer
           poetry run pytest
 
   # Deuxième job : construire l'image Docker
