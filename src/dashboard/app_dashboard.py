@@ -24,7 +24,6 @@ warnings.filterwarnings("ignore", category=UserWarning, module='sklearn')
 def get_client_ids():
     """Récupère la liste des ID clients depuis l'API."""
     try:
-        # --- CORRECTION APPLIQUÉE ICI ---
         headers = {"Authorization": f"Bearer {st.session_state['token']}"}
         response = requests.get(f"{settings.api_url}/clients", headers=headers)
         if response.status_code == 200:
@@ -40,7 +39,6 @@ def get_client_ids():
 def get_api_logs(limit: int = 100):
     """Récupère les logs de l'API avec une limite."""
     try:
-        # --- CORRECTION APPLIQUÉE ICI ---
         headers = {"Authorization": f"Bearer {st.session_state['token']}"}
         url = f"{settings.api_url}/api-logs?limit={limit}"
         response = requests.get(url, headers=headers)
@@ -57,7 +55,6 @@ def get_api_logs(limit: int = 100):
 def get_drift_reports_list():
     """Récupère la liste des rapports de dérive disponibles."""
     try:
-        # --- CORRECTION APPLIQUÉE ICI ---
         headers = {"Authorization": f"Bearer {st.session_state['token']}"}
         response = requests.get(f"{settings.api_url}/drift-reports", headers=headers)
         if response.status_code == 200:
@@ -73,7 +70,6 @@ def get_drift_reports_list():
 def get_drift_report_detail(report_id):
     """Récupère le contenu HTML d'un rapport de dérive spécifique."""
     try:
-        # --- CORRECTION APPLIQUÉE ICI ---
         headers = {"Authorization": f"Bearer {st.session_state['token']}"}
         response = requests.get(f"{settings.api_url}/drift-reports/{report_id}", headers=headers)
         if response.status_code == 200:
@@ -89,12 +85,11 @@ def trigger_drift_report_generation():
     """Déclenche la génération d'un nouveau rapport de dérive via l'API."""
     with st.spinner("Génération du rapport en cours..."):
         try:
-            # --- CORRECTION APPLIQUÉE ICI ---
             headers = {"Authorization": f"Bearer {st.session_state['token']}"}
             response = requests.post(f"{settings.api_url}/drift-reports", headers=headers)
             if response.status_code == 201:
                 st.success("Rapport de dérive généré avec succès ! Le cache va être vidé pour rafraîchir la liste.")
-                st.cache_data.clear() 
+                st.cache_data.clear()
                 st.rerun()
             else:
                 st.error(f"Échec de la génération du rapport : {response.status_code} - {response.text}")
@@ -171,7 +166,7 @@ else:
     # --- Onglet 2: Performance ---
     with tab2:
         st.header("Monitoring de Performance de l'API")
-        
+
         if st.checkbox("Charger l'historique complet des logs"):
             logs_df = get_api_logs(limit=0)
         else:
@@ -218,5 +213,20 @@ else:
                     report_html = get_drift_report_detail(report_id)
                     if report_html:
                         st.components.v1.html(report_html, height=600, scrolling=True)
+
+                        # --- AJOUT DE LA FONCTIONNALITÉ DE TÉLÉCHARGEMENT ---
+                        st.divider()
+                        st.subheader("Exporter le rapport")
+
+                        # Crée un nom de fichier propre à partir de l'option sélectionnée
+                        clean_filename = selected_report_display.replace(' ', '_').replace(':', '').replace('#', 'id')
+
+                        st.download_button(
+                           label="📥 Télécharger ce rapport (HTML)",
+                           data=report_html.encode("utf-8"),
+                           file_name=f"{clean_filename}.html",
+                           mime="text/html",
+                           help="Cliquez pour télécharger le rapport actuellement affiché au format HTML."
+                        )
         else:
             st.info("Aucun rapport de dérive n'a été généré pour le moment.")
